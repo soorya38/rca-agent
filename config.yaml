@@ -1,0 +1,71 @@
+# Helios Configuration File
+# This file contains advanced configuration options for the Helios platform
+
+# LLM Provider Settings
+llm:
+  provider: "ollama"  # Options: "ollama", "openai"
+  
+  # Ollama specific settings
+  ollama:
+    base_url: "http://ollama:11434"
+    model: "llama3.2:latest"
+    timeout: 300  # seconds
+    options:
+      temperature: 0.7
+      top_p: 0.9
+      max_tokens: 4000
+  
+  # OpenAI specific settings
+  openai:
+    model: "gpt-4"
+    timeout: 120  # seconds
+    max_tokens: 4000
+    temperature: 0.7
+
+# Database Settings
+database:
+  host: "postgres"
+  port: 5432
+  name: "helios"
+  user: "helios"
+  password: "helios_password"
+  pool:
+    min_size: 5
+    max_size: 20
+
+# Service Communication
+services:
+  ai_core:
+    url: "http://helios-ai-core:8001"
+    timeout: 300
+    retries: 3
+  
+  api_gateway:
+    url: "http://helios-api-gateway:8000"
+    cors_origins: ["*"]  # Configure for production
+
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Feature Flags
+features:
+  conversation_history: true
+  health_checks: true
+  metrics: false  # Future feature
+  authentication: false  # Future feature
+
+# Future Extensibility Examples
+connectors:
+  # Example Loki connector configuration (placeholder)
+  loki:
+    enabled: false
+    url: "http://loki:3100"
+    query_timeout: 30
+  
+  # Example Prometheus connector (placeholder)
+  prometheus:
+    enabled: false
+    url: "http://prometheus:9090"
+    scrape_interval: 15 

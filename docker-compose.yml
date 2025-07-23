@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database for conversation storage
+  postgres:
+    image: postgres:15-alpine
+    container_name: helios-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-helios}
+      POSTGRES_USER: ${POSTGRES_USER:-helios}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-helios_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - helios-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-helios}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Ollama LLM Service
+  ollama:
+    image: ollama/ollama:latest
+    container_name: helios-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - helios-network
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Helios AI Core Service
+  helios-ai-core:
+    build:
+      context: ./helios-ai-core
+      dockerfile: Dockerfile
+    container_name: helios-ai-core
+    environment:
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:latest}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4}
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    ports:
+      - "8001:8001"
+    networks:
+      - helios-network
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+  # Helios API Gateway Service
+  helios-api-gateway:
+    build:
+      context: ./helios-api-gateway
+      dockerfile: Dockerfile
+    container_name: helios-api-gateway
+    environment:
+      AI_CORE_URL: ${AI_CORE_URL:-http://helios-ai-core:8001}
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_USER: ${POSTGRES_USER:-helios}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-helios_password}
+      POSTGRES_DB: ${POSTGRES_DB:-helios}
+    ports:
+      - "8000:8000"
+    networks:
+      - helios-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      helios-ai-core:
+        condition: service_started
+    restart: unless-stopped
+
+  # Helios Frontend Service
+  helios-frontend:
+    build:
+      context: ./helios-frontend
+      dockerfile: Dockerfile
+    container_name: helios-frontend
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    ports:
+      - "3000:80"
+    networks:
+      - helios-network
+    depends_on:
+      - helios-api-gateway
+    restart: unless-stopped
+
+networks:
+  helios-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  ollama_data:
+    driver: local 
